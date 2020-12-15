@@ -21,16 +21,16 @@ public class OcrController {
 	@PostMapping("/ocr")
 	public ResponseEntity<String> detectText(OcrPathDto ocrPathDto)  {
 		
-		ResponseEntity<String> result=new ResponseEntity<>(HttpStatus.OK);
+		ResponseEntity<String> result=new ResponseEntity<>("Successfull",HttpStatus.OK);
 		try {
 			detectService.detectDocumentsGcs(ocrPathDto.getGcsSourcePath(), ocrPathDto.getGcsDestinationPath());
 		} catch (Exception e) {
-			result=new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+			result=new ResponseEntity<>(e.getMessage()==null?"NullPointer":e.getMessage(),HttpStatus.BAD_REQUEST);
 		}
 		return result;
 	}
 	
-	@GetMapping
+	@GetMapping("test")
 	public String testOCRController() {
 		return "Hello OCR";
 	}
