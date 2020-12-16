@@ -1,6 +1,6 @@
 package com.wholesale.hackathon.demo.dto;
 
-public class OcrPathDto {
+public class OcrInputDto {
 
 	private String gcsSourcePath;
 	private String gcsDestinationPath;
