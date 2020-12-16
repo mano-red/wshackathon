@@ -8,6 +8,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Stream;
@@ -27,6 +28,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.wholesale.hackathon.demo.dto.AddSearch;
+import com.wholesale.hackathon.demo.dto.Doc;
 import com.wholesale.hackathon.demo.dto.OcrInputDto;
 import com.wholesale.hackathon.demo.dto.OcrOutputDto;
 import com.wholesale.hackathon.demo.dto.User;
@@ -61,7 +64,7 @@ public class UpdateService {
 
 	}
 
-	public void doUpload(List<MultipartFile> files, String depName, String clientId) {
+	public void doUpload(List<MultipartFile> files, String depName, String clientId, String email, String uploadId) {
 		HttpHeaders headers = new HttpHeaders();
 		headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
@@ -112,9 +115,46 @@ public class UpdateService {
 				}
 			}
 
-			System.out.println(yes);
+			populateAddinSearch(randomNum, depName, clientId, email, uploadId);
 		}
 
+	}
+	private void populateAddinSearch(int artifact, String depName, String clientId, String email, String uploadId) {
+		String url = "http://34.70.70.22:8081/add-in-search";
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+
+		// create a post object
+		AddSearch post = new AddSearch();
+		post.setDoc_type("document");
+		Doc document = new Doc();
+		document.setArtifact_id(String.valueOf(artifact));
+		document.setClient_id(clientId);
+		document.setContent("this document contains stock trade value for year 2020 for moody");
+		document.setEmail(email);
+		document.setGroup_id("Main");
+		document.setIs_active("true");
+		document.setLink("http//local:3000/arti/54354.txt");
+		document.setName("stock.csv");
+		document.setTags("DIFF,COVENENT");
+		document.setType(depName);
+		document.setUploder_id(uploadId);
+		post.setDoc(document);
+
+		// build the request
+		HttpEntity<AddSearch> request = new HttpEntity<>(post, headers);
+
+		// send POST request
+		ResponseEntity<AddSearch> response = restTemplate.postForEntity(url, request, AddSearch.class);
+		if (response.getStatusCode() == HttpStatus.CREATED) {
+			System.out.println("Post Created");
+			System.out.println(response.getBody());
+		} else {
+			System.out.println("Request Failed");
+			System.out.println(response.getStatusCode());
+		}
+		
 	}
 
 	public String storeFile(MultipartFile file) throws Exception {
