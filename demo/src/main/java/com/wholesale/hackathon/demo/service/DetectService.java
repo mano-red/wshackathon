@@ -57,6 +57,7 @@ public class DetectService {
 		OcrOutputDto ocrOutputDto = new OcrOutputDto();
 
 		String fileExtension = getFileExtension(ocrInputDto.getGcsSourcePath());
+		System.out.println("fileExtension " + fileExtension);
 		if ("PDF".equalsIgnoreCase(fileExtension)) {
 			extractedText = detectDocumentsGcs(ocrInputDto.getGcsSourcePath(), ocrInputDto.getGcsDestinationPath());
 		} else if (imageTypes.contains(fileExtension.toUpperCase())) {
@@ -442,7 +443,7 @@ public class DetectService {
 		return FilenameUtils.getName(filePath);
 	}
 
-	private String getFileExtension(String filename) {
+	public String getFileExtension(String filename) {
 		return FilenameUtils.getExtension(filename);
 	}
 
