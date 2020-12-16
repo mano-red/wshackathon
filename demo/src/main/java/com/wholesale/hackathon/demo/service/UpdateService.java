@@ -56,12 +56,11 @@ public class UpdateService {
 
 	}
 
-	public void doUpload(List<MultipartFile> files) {
+	public void doUpload(List<MultipartFile> files, String depName, String clientId) {
 		HttpHeaders headers = new HttpHeaders();
 		headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 		
 		MultiValueMap<String, Object> body = new LinkedMultiValueMap<String, Object>();
-		int randomNum = ThreadLocalRandom.current().nextInt(33000, 99000 + 1);
 		for(MultipartFile file : files) {
 			
 			try {
@@ -85,8 +84,8 @@ public class UpdateService {
 			System.out.println(fileName);
 			
 			HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body,headers);
-			
-			String url = "http://34.70.70.22:8081/upload-files?bucket_name=codemongers.appspot.com&source_file_name="+fileName+"&destination_blob_name="+String.valueOf(randomNum)+"|"+fileName;
+			int randomNum = ThreadLocalRandom.current().nextInt(33000, 99000 + 1);
+			String url = "http://34.70.70.22:8081/upload-files?bucket_name=codemongers.appspot.com&source_file_name="+fileName+"&destination_blob_name="+depName+"|"+clientId+"|"+String.valueOf(randomNum)+".txt";
 			System.out.println(url);
 			ResponseEntity<String> yes = restTemplate.exchange(url,	HttpMethod.GET, requestEntity, String.class);
 			

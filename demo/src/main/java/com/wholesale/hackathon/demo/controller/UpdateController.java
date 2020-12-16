@@ -29,8 +29,8 @@ public class UpdateController {
 	
 	@ResponseStatus(HttpStatus.OK)
 	@PostMapping(path = "/upload")
-	public void upload(@RequestParam("files") List<MultipartFile> files) {
-		service.doUpload(files);
+	public void upload(@RequestParam("files") List<MultipartFile> files, @RequestParam("depName") String depName, @RequestParam("clientId") String clientId) {
+		service.doUpload(files, depName, clientId);
 		
 	}
 	
