@@ -96,6 +96,12 @@ public class UpdateService {
 					+ fileName + "&destination_blob_name=" + depName + "|" + clientId + "|" + String.valueOf(randomNum)
 					+ fileExtension;
 
+			String downloadBaseUrl = "http://34.70.70.22:8081/download-files?bucket_name=codemongers.appspot.com&source_blob_name=";
+
+			String destinationbaseUrl = "&destination_file_name=";
+			String downloadUrl = downloadBaseUrl + depName + "|" + clientId + "|" + String.valueOf(randomNum)
+					+ fileExtension + destinationbaseUrl + fileName;
+
 			String ocrBaseUrl = "gs://codemongers.appspot.com/";
 			String ocrUrl = ocrBaseUrl + depName + "/" + clientId + "/" + String.valueOf(randomNum) + fileExtension;
 			System.out.println(url);
@@ -108,6 +114,8 @@ public class UpdateService {
 			if (yes.getStatusCode() == HttpStatus.OK) {
 				try {
 					OcrOutputDto ocrOutputDto = detectService.detectText(ocrInputDto);
+					populateAddinSearch(randomNum, depName, clientId, email, uploadId,
+							ocrOutputDto.getExtractedText() + " " + fileName, downloadUrl);
 					System.out.println(ocrOutputDto.getDocName() + " " + ocrOutputDto.getExtractedText());
 				} catch (Exception e) {
 					// TODO Auto-generated catch block
@@ -115,11 +123,12 @@ public class UpdateService {
 				}
 			}
 
-			populateAddinSearch(randomNum, depName, clientId, email, uploadId);
 		}
 
 	}
-	private void populateAddinSearch(int artifact, String depName, String clientId, String email, String uploadId) {
+
+	private void populateAddinSearch(int artifact, String depName, String clientId, String email, String uploadId,
+			String content, String downloadUrl) {
 		String url = "http://34.70.70.22:8081/add-in-search";
 		HttpHeaders headers = new HttpHeaders();
 		headers.setContentType(MediaType.APPLICATION_JSON);
@@ -131,11 +140,11 @@ public class UpdateService {
 		Doc document = new Doc();
 		document.setArtifact_id(String.valueOf(artifact));
 		document.setClient_id(clientId);
-		document.setContent("this document contains stock trade value for year 2020 for moody");
+		document.setContent(content);
 		document.setEmail(email);
 		document.setGroup_id("Main");
 		document.setIs_active("true");
-		document.setLink("http//local:3000/arti/54354.txt");
+		document.setLink(downloadUrl);
 		document.setName("stock.csv");
 		document.setTags("DIFF,COVENENT");
 		document.setType(depName);
@@ -154,7 +163,7 @@ public class UpdateService {
 			System.out.println("Request Failed");
 			System.out.println(response.getStatusCode());
 		}
-		
+
 	}
 
 	public String storeFile(MultipartFile file) throws Exception {
