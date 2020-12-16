@@ -8,7 +8,6 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Stream;
@@ -28,8 +27,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.wholesale.hackathon.demo.dto.AddSearch;
-import com.wholesale.hackathon.demo.dto.Doc;
+import com.wholesale.hackathon.demo.dto.OcrInputDto;
+import com.wholesale.hackathon.demo.dto.OcrOutputDto;
 import com.wholesale.hackathon.demo.dto.User;
 import com.wholesale.hackathon.demo.repo.UserRepository;
 
@@ -37,13 +36,16 @@ import com.wholesale.hackathon.demo.repo.UserRepository;
 public class UpdateService {
 	@Autowired
 	UserRepository repo;
-	
+
 	@Autowired
 	private RestTemplate restTemplate;
 
-	@Value("${path}")
+	@Autowired
+	private DetectService detectService;
+
+	@Value("${file.path}")
 	private String path;
-	
+
 	public void save(User user) {
 		repo.save(user);
 
@@ -52,131 +54,109 @@ public class UpdateService {
 	public List<User> getData() {
 		Iterable<User> user = repo.findAll();
 
-		List<User> users = new ArrayList();
+		List<User> users = new ArrayList<>();
 		user.forEach(e -> users.add(e));
 
 		return users;
 
 	}
 
-	public void doUpload(List<MultipartFile> files, String depName, String clientId, String email, String uploadId) {
+	public void doUpload(List<MultipartFile> files, String depName, String clientId) {
 		HttpHeaders headers = new HttpHeaders();
 		headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-		
+
 		MultiValueMap<String, Object> body = new LinkedMultiValueMap<String, Object>();
-		for(MultipartFile file : files) {
-			
+		for (MultipartFile file : files) {
+
 			try {
-				body.add("file", new MultipartInputStreamFileResource(file.getInputStream(), file.getOriginalFilename()));
+				body.add("file",
+						new MultipartInputStreamFileResource(file.getInputStream(), file.getOriginalFilename()));
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-			
-			
+
 			String fileName = null;
-			
+
 			try {
 				fileName = storeFile(file);
 			} catch (Exception e) {
 				e.printStackTrace();
-			} 
+			}
 
-			  
-			  
 			System.out.println(fileName);
-			
-			HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body,headers);
+			String fileExtension = "." + detectService.getFileExtension(fileName);
+
+			HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 			int randomNum = ThreadLocalRandom.current().nextInt(33000, 99000 + 1);
-			String url = "http://34.70.70.22:8081/upload-files?bucket_name=codemongers.appspot.com&source_file_name="+fileName+"&destination_blob_name="+depName+"|"+clientId+"|"+String.valueOf(randomNum);
+			String url = "http://34.70.70.22:8081/upload-files?bucket_name=codemongers.appspot.com&source_file_name="
+					+ fileName + "&destination_blob_name=" + depName + "|" + clientId + "|" + String.valueOf(randomNum)
+					+ fileExtension;
+
+			String ocrBaseUrl = "gs://codemongers.appspot.com/";
+			String ocrUrl = ocrBaseUrl + depName + "/" + clientId + "/" + String.valueOf(randomNum) + fileExtension;
 			System.out.println(url);
-			//ResponseEntity<String> yes = restTemplate.exchange(url,	HttpMethod.GET, requestEntity, String.class);
-			populateAddinSearch(randomNum, depName, clientId, email, uploadId);
-			//System.out.println(yes);
+			ResponseEntity<String> yes = restTemplate.exchange(url, HttpMethod.GET, requestEntity, String.class);
+			OcrInputDto ocrInputDto = new OcrInputDto();
+			ocrInputDto.setGcsSourcePath(ocrUrl);
+			ocrInputDto.setGcsDestinationPath(ocrUrl + "Text");
+
+			System.out.println("yes.getStatusCode() " + yes.getStatusCode());
+			if (yes.getStatusCode() == HttpStatus.OK) {
+				try {
+					OcrOutputDto ocrOutputDto = detectService.detectText(ocrInputDto);
+					System.out.println(ocrOutputDto.getDocName() + " " + ocrOutputDto.getExtractedText());
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+
+			System.out.println(yes);
 		}
-		
 
-
-	}
-	
-	private void populateAddinSearch(int artifact, String depName, String clientId, String email, String uploadId) {
-		String url = "http://34.70.70.22:8081/add-in-search";
-		HttpHeaders headers = new HttpHeaders();
-		headers.setContentType(MediaType.APPLICATION_JSON);
-		headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-
-		// create a post object
-		AddSearch post = new AddSearch();
-		post.setDoc_type("document");
-		Doc document = new Doc();
-		document.setArtifact_id(String.valueOf(artifact));
-		document.setClient_id(clientId);
-		document.setContent("this document contains stock trade value for year 2020 for moody");
-		document.setEmail(email);
-		document.setGroup_id("Main");
-		document.setIs_active("true");
-		document.setLink("http//local:3000/arti/54354.txt");
-		document.setName("stock.csv");
-		document.setTags("DIFF,COVENENT");
-		document.setType(depName);
-		document.setUploder_id(uploadId);
-		post.setDoc(document);
-
-		// build the request
-		HttpEntity<AddSearch> request = new HttpEntity<>(post, headers);
-
-		// send POST request
-		ResponseEntity<AddSearch> response = restTemplate.postForEntity(url, request, AddSearch.class);
-		if (response.getStatusCode() == HttpStatus.CREATED) {
-		    System.out.println("Post Created");
-		    System.out.println(response.getBody());
-		} else {
-		    System.out.println("Request Failed");
-		    System.out.println(response.getStatusCode());
-		}
-		
 	}
 
 	public String storeFile(MultipartFile file) throws Exception {
-        String fileName = StringUtils.cleanPath(file.getOriginalFilename());
+		String fileName = StringUtils.cleanPath(file.getOriginalFilename());
 
-        try {
-            if(fileName.contains("..")) {
-                throw new Exception("Sorry! Filename contains invalid path sequence " + fileName);
-            }
+		try {
+			if (fileName.contains("..")) {
+				throw new Exception("Sorry! Filename contains invalid path sequence " + fileName);
+			}
 
-            createDirectory(path);
-            
-            FileOutputStream out = new FileOutputStream(path+fileName);
-            copyStream (file.getInputStream(), out);
-            out.close();
+			createDirectory(path);
 
-            return fileName;
-        } catch (IOException ex) {
-            throw new Exception("Could not store file " + fileName + ". Please try again!", ex);
-        }
-    }
-	
-	public static void copyStream(InputStream in, OutputStream out) throws IOException {
-	    byte[] buffer = new byte[1024];
-	    int read;
-	    while ((read = in.read(buffer)) != -1) {
-	        out.write(buffer, 0, read);
-	    }
+			FileOutputStream out = new FileOutputStream(path + fileName);
+			copyStream(file.getInputStream(), out);
+			out.close();
+
+			return fileName;
+		} catch (IOException ex) {
+			throw new Exception("Could not store file " + fileName + ". Please try again!", ex);
+		}
 	}
-	
-	private void createDirectory(String... directory){
+
+	public static void copyStream(InputStream in, OutputStream out) throws IOException {
+		byte[] buffer = new byte[1024];
+		int read;
+		while ((read = in.read(buffer)) != -1) {
+			out.write(buffer, 0, read);
+		}
+	}
+
+	private void createDirectory(String... directory) {
 		Stream.of(directory).forEach(dir -> {
-				try {
-					Path dirPath = new File(new File(dir).getCanonicalPath()).toPath();
-					if (!Files.exists(dirPath)) {
-						Files.createDirectories(dirPath);
-					}
-				} catch (IOException e) {
-					e.printStackTrace();
+			try {
+				Path dirPath = new File(new File(dir).getCanonicalPath()).toPath();
+				if (!Files.exists(dirPath)) {
+					Files.createDirectories(dirPath);
 				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		});
-		
+
 	}
 
 	public void doDownload() {
